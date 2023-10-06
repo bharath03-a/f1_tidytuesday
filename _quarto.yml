@@ -8,8 +8,8 @@ website:
       - href: index.qmd
         text: Home
       - about.qmd
-    logo: images\pandas.png
-  favicon:  images\pandas.png
+    logo: images\f1_logo.png
+  favicon:  images\f1_logo.png
 
 format:
   html:
