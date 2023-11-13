@@ -6,8 +6,8 @@ format:
   html:
       code-tools: true
       code-link: true
+      code-fold: true
 toc: true
-code-annotations: hover
 categories: 
   - R
   - DataViz
@@ -31,20 +31,15 @@ if (!require(pacman)) #<1>
 
 
 pacman::p_load(tidyverse,
-               openintro,
-               gridExtra,
                tidytuesdayR,
                dplyr,
+               here,
                dlookr,
-               DMwR2,  # Data Mining with R functions
-               GGally, # Pair-wise plots using ggplot2
-               Hmisc,  # Data analysis
-               formattable)   #<2>
+               formattable,
+               ggiraph,
+               plotly)   #<2>
+pacman::p_load_gh("wilkelab/ungeviz")
 ```
-
-1.  This block is to check if `pacman` package is installed or not, if it isn't then the package will be installed.
-
-2.  `p_load` is a function from `pacman` package to load other packages, if isn't installed `pacman` will handle the installation.
 
 Setting the default theme ggplot and output options for the chunk - as suggested in the class.
 
@@ -61,29 +56,28 @@ options(width = 65)
 # setting figure parameters for knitr
 knitr::opts_chunk$set(
   fig.width = 8,        # 8" width
+  fig.height = 9,
   fig.asp = 0.618,      # the golden ratio
-  fig.retina = 4,       # dpi multiplier for displaying HTML output on retina
+  fig.retina = 2,       # dpi multiplier for displaying HTML output on retina
   fig.align = "center", # center align figures
-  dpi = 350             # higher dpi, sharper image
+  dpi = 2000             # higher dpi, sharper image
 )
 ```
 
 ## Getting Data
 
 ```{r f1_data, warning=FALSE, message=FALSE}
-tuesdata <- tidytuesdayR::tt_load('2021-09-07')
-
-results <- tuesdata$results
-driver_standings <- tuesdata$driver_standings
-races <- tuesdata$races
-drivers <- tuesdata$drivers
+results <- read_csv(here("data", "results.csv"))
+driver_standings <- read_csv(here("data", "driver_standings.csv"))
+races <- read_csv(here("data", "races.csv"))
+drivers <- read_csv(here("data", "drivers.csv"))
 ```
 
 ```{r driver_results, warning=FALSE, message=FALSE}
 driver_results_df <- driver_standings |>
   left_join(races, by = "raceId") |>
   rename(driver_url = url) |>
-  left_join(drivers, by = "driverId") |> filter( year >= 2020)
+  left_join(drivers, by = "driverId") |> filter( year >= 2021)
 
 missing_count <- colSums(is.na(driver_results_df))
 
@@ -95,18 +89,19 @@ missing_count
 #### Who's the youngest F1 driver with the most wins? Who's the oldest F1 driver in the history of the sport? And who's everyone in between?
 
 ::: callout-note
-Getting only data after 2017 for relevancy!
+Getting only data after 2021 for relevancy!
 :::
 
 As of now the unknowns are age of the drivers, and their position in the races. We need to two new columns to cater that data.
 
 ```{r f1_functions, warning=FALSE, message=FALSE}
-calculateAge <- function(dob) {
+calculateAge <- function(dob, date) {
   # Convert DOB to Date class
   dob <- as.Date(dob)
+  race_date <- as.Date(date)
   
   # Calculate age
-  age <- as.integer(difftime(Sys.Date(), dob, units = "days") / 365)
+  age <- as.integer(difftime(race_date, dob, units = "days"))
   
   return(age)
 }
@@ -122,14 +117,24 @@ getRacePos <- function(position) {
 ```
 
 ```{r data_preprocessing, warning=FALSE, message=FALSE}
-driver_results_df <- driver_results_df |> mutate(
-  drivers_age = calculateAge(driver_results_df$dob),
-  race_pos = getRacePos(driver_results_df$position)
-)
+driver_results_df <- driver_results_df |>
+  mutate(
+    drivers_age = calculateAge(driver_results_df$dob, driver_results_df$date),
+    race_pos = getRacePos(driver_results_df$position)
+  )
 ```
 
 ```{r initial_plot, warning=FALSE, message=FALSE, fig.height=10}
-ggplot(driver_results_df, mapping = aes(x = code, y = drivers_age)) +
-  geom_point(aes(color = race_pos, size=3), stat='identity') + 
-  coord_flip()
+f1_plot =
+  ggplot(driver_results_df, mapping = aes(x = drivers_age, y = code)) +
+  geom_point_interactive(
+    aes(
+      color =,
+      tooltip = name
+    ),
+    shape = 108,
+    size = 20
+  )
+
+girafe(ggobj = f1_plot)
 ```
